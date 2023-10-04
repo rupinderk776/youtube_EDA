@@ -1,0 +1,291 @@
+---
+title: "Project 1"
+author: 'RUPINDER KAUR (24119157)'
+output: html_document
+---
+
+# **INTRODUCTION**
+
+#Video URL: <https://youtu.be/zmTcmldCjQQ>
+
+The data-set analyzed is the Global YouTube Statistics 2023 obtained from kaggle.com, collected by Nidula Elgiriyewithana.
+
+*YouTube, as we all know, is the most popular online video sharing and social media platform owned by Google.The data set includes top 995 YouTube channels in the year 2023 along with their information such as rank, subscriber count, video views, channel category and the geographical information.*
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# **DATA IMPORT, OVERVIEW AND SETUP**
+
+#### Load libraries
+
+```{r message=FALSE, warning=FALSE}
+library(shiny)
+library(ggplot2)
+library(tidyverse)
+library(corrplot)
+library(dplyr)
+library(tidyr)
+library(melt)
+```
+
+#### Load the main data
+
+```{r}
+setwd("C:/Users/User/OneDrive/Desktop/EDA project")
+yt <- read.csv("youtube_UTF_8.csv")
+```
+
+#### Using str() to analyse the data
+
+```{r echo=T, results='hide'}
+str(yt)
+```
+
+The data set consists of 995 objects with 28 variables, comprised by 17 numeric, 4 integer, and 7 character variables. The columns containing information about the video views, earnings and population have data in scientific notations.
+
+#### Using summary() to analyze the data
+
+```{r echo=T, results='hide'}
+summary(yt)
+```
+
+#### Viewing first six observations using head()
+
+```{r echo=T, results='hide'}
+head(yt)
+```
+
+*Using the above functions it can be observed that the data contains missing values as well as Nan values.*
+
+### **DATA CLEANING**
+
+#### Analyze the number of NA for each variable
+
+```{r}
+apply(is.na(yt), 2, sum)
+```
+
+*It can be observed that there are certain NA and Nan values in various columns.*
+
+#### **Handling the NA and Nan values**
+
+*Missing values in country may be due to errors during data gathering and for country rank as well, this may be because the country rank is unknown at the time. So, the values can be mutated to "Unknown" and "0"*
+
+Reference:- (ChatGPT, Personal Communication, 2023)
+
+```{r echo=T, results='hide'}
+yt <- yt %>%
+  mutate(Country = replace_na(Country, "Unknown"))
+
+yt <- yt %>%
+  mutate(country_rank = replace_na(country_rank, 0))
+```
+
+*Missing values in channel type rank may be because the categories are new and have not been assigned any rank. So, the values can be mutated to 0.*
+
+```{r echo=T, results='hide'}
+yt <- yt %>%
+  mutate(channel_type_rank = replace_na(channel_type_rank, 0))
+```
+
+*In case of recent subscribers and video views, missing values may be because the account is no longer active. So, those values can also be mutated to 0 as well.*
+
+```{r echo=T, results='hide'}
+yt <- yt %>%
+  mutate(subscribers_for_last_30_days = replace_na(subscribers_for_last_30_days, 0))
+
+yt <- yt %>%
+  mutate(video_views_for_the_last_30_days = replace_na(video_views_for_the_last_30_days, 0))
+```
+
+*In case of population and education enrollment, may be because of incomplete data. For geographical information like latitude and longitude, may be because they are small towns and do not have exact information about the coordinates.*
+
+```{r echo=T, results='hide'}
+yt <- yt %>%
+  mutate(Gross.tertiary.education.enrollment.... = replace_na(Gross.tertiary.education.enrollment...., 0))
+
+yt <- yt %>%
+  mutate(Population = replace_na(Population, 0))
+
+yt <- yt %>%
+  mutate(Unemployment.rate = replace_na(Unemployment.rate, 0))
+
+yt <- yt %>%
+  mutate(Urban_population = replace_na(Urban_population, 0))
+
+yt <- yt %>%
+  mutate(Latitude = replace_na(Latitude, 0))
+
+yt <- yt %>%
+  mutate(Longitude = replace_na(Longitude, 0))
+```
+
+#### Fixing the scientific notations in numerical variables ([Reference](https://www.datakwery.com/post/2020-07-11-scientific-notation-in-r/#:~:text=If%20you%20want%20to%20avoid,scientific%20%3D%20FALSE%20as%20an%20argument. "Fixing Scientific notations"))
+
+```{r echo=T, results='hide'}
+options(scipen = 999)
+```
+
+## **DATA EXPLORATION**
+
+#### **Analyzing distribution of categories**
+
+```{r, fig.width = 12}
+yt %>%
+  group_by(category) %>%
+  summarise(count = n()) %>%
+  ggplot(aes(x = reorder(category, -count), y = count, fill = category)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Distribution of Categories", x = "Category", y = "Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+*It can be observed that most videos belong to the entertainment category followed by music and blogs*.
+
+#### **Analyzing subscribers by channel type**
+
+```{r, fig.width = 12}
+channel_type_subscribers <- yt %>%
+  group_by(channel_type) %>%
+  summarize(mean_subscribers = mean(subscribers))
+
+ggplot(channel_type_subscribers, aes(x = channel_type, y = mean_subscribers)) +
+  geom_bar(stat = "identity", fill = "purple") +
+  coord_flip() +
+  labs(title = "Mean Subscribers by Channel Type", x = "Channel Type", y = "Mean Subscribers")
+```
+
+*It can be observed that sports and non-profit channels have the most subscribers followed by education and music channels.*
+
+#### **Analyzing the distribution of channels within different categories**
+
+```{r, fig.width = 12}
+custom_palette <- scales::hue_pal()(n = 15) 
+
+ggplot(yt, aes(x = category, fill = channel_type)) +
+  geom_bar(position = "stack") +
+  labs(title = "Distribution of Channel Types within Different Categories",
+       x = "Category",
+       y = "Count") +
+  theme_minimal() +
+  scale_fill_manual(values = custom_palette) +  
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  
+
+```
+
+*The graph demonstrates a diverse mix within different categories. This could indicate a rich variety of content creators catering to different aspects among the categories*.
+
+#### **Analyzing video views by category**
+
+```{r, fig.width = 12}
+ggplot(yt, aes(x = category, y = video.views)) +
+  geom_boxplot(fill = "lightgreen", color = "black") +
+  coord_flip() +
+  labs(title = "Boxplot of Video Views by Category", x = "Category", y = "Video Views")
+```
+
+*As compared with the subscribers by category, most median views are observed for shows, followed closely by music. The outliers indicate that music, education and shows have high video views.*
+
+#### **Analyzing subscriber count vs. video views**
+
+```{r, fig.width = 12}
+ggplot(yt, aes(x = subscribers, y = video.views)) +
+  geom_point(alpha = 0.6) +  # Adding points with some transparency
+  labs(title = "Scatter Plot of Subscriber Count vs. Video Views",
+       x = "Subscriber Count",
+       y = "Video Views")
+
+```
+
+#### **Analyzing video views and subscribers for last 30 days**
+
+```{r, fig.width = 12}
+ggplot(yt, aes(x = subscribers_for_last_30_days, y = video_views_for_the_last_30_days)) +
+  geom_point(alpha = 0.6) +  
+  labs(title = "Scatter Plot of Subscribers Gained vs. Video Views Gained (Last 30 Days)",
+       x = "Subscribers for Last 30 Days",
+       y = "Video Views for Last 30 Days")
+
+```
+
+*The graphs depict a positive correlation between subscribers and video views. Thus, when the number of subscribers increase, the video views also tend to increase. In other words, channels with more subscribers have higher video views.*
+
+#### **Analyzing lowest and highest monthly earnings by channel type**
+
+```{r, fig.width = 12}
+ggplot(yt, aes(x = channel_type)) +
+  geom_line(aes(y = highest_monthly_earnings, color = "Highest Earnings")) +
+  geom_line(aes(y = lowest_monthly_earnings, color = "Lowest Earnings")) +
+  labs(title = "Monthly Earnings by Channel Type",
+       x = "Channel Type",
+       y = "Earnings") +
+  scale_color_manual(values = c("Highest Earnings" = "blue", "Lowest Earnings" = "red")) +
+  theme_minimal()
+
+```
+
+#### **Yearly earnings by channel type**
+
+```{r, fig.width = 12}
+ggplot(yt, aes(x = channel_type)) +
+  geom_line(aes(y = highest_yearly_earnings, color = "Highest Earnings")) +
+  geom_line(aes(y = lowest_yearly_earnings, color = "Lowest Earnings")) +
+  labs(title = "Yearly Earnings by Channel Type",
+       x = "Channel Type",
+       y = "Earnings") +
+  scale_color_manual(values = c("Highest Earnings" = "blue", "Lowest Earnings" = "red")) +
+  theme_minimal()
+
+```
+
+*From the above graphs, it is evident that, the blogging channels generate the most revenue both on monthly and yearly basis, followed by entertainment and music channels.*
+
+#### **Analyzing subscribers by country**
+
+```{r, fig.width = 12}
+ggplot(yt, aes(x = Country, y = subscribers, fill = Country)) +
+  geom_boxplot() +
+  coord_flip() +
+  labs(title = "Subscribers by Country", x = "Country", y = "Subscribers")
+```
+
+#### **Analyzing top 10 YouTubers by country**
+
+```{r, fig.width = 12}
+top_10_youtubers <- yt[1:10, ]
+
+ggplot(top_10_youtubers, aes(x = rank, y = Country, color = subscribers)) +
+  geom_point(size = 3) +
+  labs(title = "",
+       x = "Rank",
+       y = "Country",
+       color = "Subscribers") +
+  theme_minimal() +
+  scale_color_gradient(low = "blue", high = "red")  
+
+```
+
+*It can be observed that the top 10 YouTubers are from only 4 countries: India, US, Japan, Russia and 1 from Unknown.*
+
+#### **Analyzing unemployment rate by country**
+
+```{r, fig.width = 12}
+ggplot(yt, aes(x = Country, y = Unemployment.rate, fill = Country)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "Unemployment Rate by Country", x = "Country", y = "Unemployment Rate")
+```
+
+*It is also interesting to note that the unemployment rate is also the highest in US and India, the countries that have the top ranked YouTuber's. This may indicate that the people in these regions use YouTube professionally as a source of income due to high unemployment rate.*
+
+#### Analyzing correlations between numeric variables like subscribers, video views and unemployment rate
+
+```{r, fig.width = 12}
+numeric_data <- yt[, c("subscribers", "video.views", "Unemployment.rate")]  
+correlation_matrix <- cor(numeric_data)
+corrplot(correlation_matrix, method = "color", type = "upper", tl.col = "black", tl.srt = 45)
+
+```
